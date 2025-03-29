@@ -3,11 +3,12 @@ import { LayoutDashboard, Users, Building2, AlertTriangle, Heater as Gate, Alert
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/auth';
 import toast from 'react-hot-toast';
+import { useEffect, useState } from 'react';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Utenti', href: '/users', icon: Users },
-  { name: 'Aziende', href: '/companies', icon: Building2, adminOnly: true },
+  { name: 'Aziende', href: '/companies', icon: Building2, superAdminOnly: true },
   { name: 'Aree Pericolose', href: '/hazardous-areas', icon: AlertTriangle },
   { name: 'Virtual Gates', href: '/virtual-gates', icon: Gate },
   { name: 'Log Emergenze', href: '/emergency-logs', icon: AlertOctagon }
@@ -16,18 +17,51 @@ const navigation = [
 export function Sidebar() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+
+  useEffect(() => {
+
+    async function fetchUserRole() {
+      const role = await handleUserRole();
+      setUserRole(role);
+    }
+    fetchUserRole();
+  });
+
+
+  const isSuperAdmin = user && userRole === 'superadmin';
+  // console.log('Is superadmin:', isSuperAdmin);
+  // console.log('User:', user);
+
+  const handleUserRole = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user!.id)
+        .single();
+
+      if (error) throw error;
+
+      // console.log('User role from database:', data.role);
+      return data.role;
+    } catch (error) {
+      console.error('Error fetching user role:', error);
+    }
+  }
 
   const handleLogout = async () => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      
+
       // Clear any local state/storage if needed
       localStorage.removeItem('supabase.auth.token');
-      
+
       // Show success message
       toast.success('Logout effettuato con successo');
-      
+
       // Redirect to login page
       navigate('/login', { replace: true });
     } catch (error) {
@@ -44,21 +78,22 @@ export function Sidebar() {
       <nav className="flex flex-1 flex-col">
         <ul className="space-y-1 p-4">
           {navigation.map((item) => (
-            <li key={item.name}>
-              <NavLink
-                to={item.href}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors
-                  ${isActive 
-                    ? 'bg-blue-50 text-blue-600' 
-                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                  }`
-                }
-              >
-                <item.icon className="h-5 w-5" />
-                {item.name}
-              </NavLink>
-            </li>
+            item.superAdminOnly && !isSuperAdmin ? null :
+              <li key={item.name}>
+                <NavLink
+                  to={item.href}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors
+                  ${isActive
+                      ? 'bg-blue-50 text-blue-600'
+                      : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                    }`
+                  }
+                >
+                  <item.icon className="h-5 w-5" />
+                  {item.name}
+                </NavLink>
+              </li>
           ))}
         </ul>
       </nav>

@@ -59,7 +59,7 @@ export function Users() {
 
       // Log users data to verify location_sharing values
       console.log('Users data:', data);
-      
+
       return data as User[];
     }
   });
@@ -88,7 +88,7 @@ export function Users() {
         .from('users')
         .update(data)
         .eq('id', id);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -109,7 +109,7 @@ export function Users() {
         .from('users')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -162,20 +162,40 @@ export function Users() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (editingUser) {
-      updateUser.mutate({ 
+      updateUser.mutate({
         id: editingUser.id,
         data: {
           name: formData.name,
           role: formData.role,
           company_id: formData.company_id,
           location_sharing: formData.location_sharing,
-          address: formData.address || null
+          address: formData.address
         }
       });
+    } else {
+      const { error } = await supabase
+        .from('users')
+        .insert({
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+          company_id: formData.company_id,
+          location_sharing: formData.location_sharing,
+          address: formData.address
+        });
+      if (error) {
+        console.error('Error creating user:', error);
+        toast.error('Errore durante la creazione dell\'utente');
+      }
+      else {
+        toast.success('Utente creato con successo');
+        queryClient.invalidateQueries({ queryKey: ['users'] });
+        handleCloseModal();
+      }
     }
-  };
+  }
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Sei sicuro di voler eliminare questo utente?')) {
@@ -243,13 +263,12 @@ export function Users() {
                   </div>
                 </td>
                 <td className="whitespace-nowrap px-6 py-4">
-                  <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${
-                    user.role === 'superadmin' 
-                      ? 'bg-purple-100 text-purple-800'
-                      : user.role === 'admin'
+                  <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${user.role === 'superadmin'
+                    ? 'bg-purple-100 text-purple-800'
+                    : user.role === 'admin'
                       ? 'bg-green-100 text-green-800'
                       : 'bg-blue-100 text-blue-800'
-                  }`}>
+                    }`}>
                     {user.role}
                   </span>
                 </td>
