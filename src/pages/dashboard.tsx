@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { AlertTriangle, Users, Building2, Bell, MapPin, Heater as Gate } from 'lucide-react';
@@ -55,16 +56,17 @@ export function Dashboard() {
   const [virtualGates, setVirtualGates] = useState<VirtualGate[]>([]);
   const [circles, setCircles] = useState<google.maps.Circle[]>([]);
   const [gatePolygons, setGatePolygons] = useState<google.maps.Polygon[]>([]);
-  
-  const { 
-    loading, 
-    currentUser, 
+
+  const {
+    loading,
+    currentUser,
     currentEmergency,
     showEmergencyModal,
-    fetchCurrentUser, 
-    simulateEmergency,
+    fetchCurrentUser,
+    // simulateEmergency,
     setShowEmergencyModal,
-    markEmergencyAsReceived
+    markEmergencyAsReceived,
+    // fetchEmergencys
   } = useEmergencyStore();
 
   useEffect(() => {
@@ -78,13 +80,19 @@ export function Dashboard() {
     if (map) {
       updateMapMarkers();
     }
+    if (currentUser) {
+      // fetchEmergencys();
+      if (currentEmergency) {
+        handleEmergency();
+      }
+    }
   }, [map, hazardousAreas, virtualGates]);
 
   // Handle emergency location from navigation state
   useEffect(() => {
     if (state?.emergency && map) {
       const { latitude, longitude } = state.emergency;
-      
+
       // Create or update marker
       if (marker) {
         marker.setMap(null);
@@ -138,7 +146,16 @@ export function Dashboard() {
         .select('id, name, geo_point, radius, company:companies(name)');
 
       if (error) throw error;
-      setHazardousAreas(data);
+
+      // Transform the data to match our interface
+      const transformedData = data.map(item => ({
+        ...item,
+        company: Array.isArray(item.company) && item.company.length > 0
+          ? { name: item.company[0].name }
+          : { name: '' }
+      }));
+
+      setHazardousAreas(transformedData);
     } catch (error) {
       console.error('Error fetching hazardous areas:', error);
       toast.error('Errore durante il caricamento delle aree pericolose');
@@ -152,7 +169,16 @@ export function Dashboard() {
         .select('id, name, geo_polygon, company:companies(name)');
 
       if (error) throw error;
-      setVirtualGates(data);
+
+      // Transform the data to match our interface
+      const transformedData = data.map(item => ({
+        ...item,
+        company: Array.isArray(item.company) && item.company.length > 0
+          ? { name: item.company[0].name }
+          : { name: '' }
+      }));
+
+      setVirtualGates(transformedData);
     } catch (error) {
       console.error('Error fetching virtual gates:', error);
       toast.error('Errore durante il caricamento dei virtual gates');
@@ -238,12 +264,12 @@ export function Dashboard() {
     // Fit bounds to show all markers if no emergency is being shown
     if (!state?.emergency && (newCircles.length > 0 || newPolygons.length > 0)) {
       const bounds = new google.maps.LatLngBounds();
-      
+
       hazardousAreas.forEach(area => {
         const [lng, lat] = area.geo_point.coordinates;
         bounds.extend({ lat, lng });
       });
-      
+
       virtualGates.forEach(gate => {
         gate.geo_polygon.coordinates[0].forEach(([lng, lat]) => {
           bounds.extend({ lat, lng });
@@ -258,7 +284,7 @@ export function Dashboard() {
     try {
       const google = await loadGoogleMaps();
       const mapElement = document.getElementById('map');
-      
+
       if (!mapElement) return;
 
       const mapInstance = new google.maps.Map(mapElement, {
@@ -284,11 +310,12 @@ export function Dashboard() {
   const handleEmergency = async () => {
     if (!map) return;
 
-    // Random location near Milan
-    const latitude = 45.4642 + (Math.random() - 0.5) * 0.02;
-    const longitude = 9.1900 + (Math.random() - 0.5) * 0.02;
+    // TEST CODE
+    // // Random location near Milan
+    // const latitude = 45.4642 + (Math.random() - 0.5) * 0.02;
+    // const longitude = 9.1900 + (Math.random() - 0.5) * 0.02;
 
-    await simulateEmergency(latitude, longitude);
+    // await simulateEmergency(latitude, longitude);
 
     // Update map marker
     if (marker) {
@@ -296,7 +323,7 @@ export function Dashboard() {
     }
 
     const newMarker = new google.maps.Marker({
-      position: { lat: latitude, lng: longitude },
+      position: { lat: currentEmergency!.latitude, lng: currentEmergency!.longitude },
       map: map,
       icon: {
         path: google.maps.SymbolPath.CIRCLE,
@@ -313,7 +340,7 @@ export function Dashboard() {
       content: `<div class="p-2">
         <p class="font-bold">Emergenza in corso</p>
         <p>Utente: ${currentUser?.name}</p>
-        <p>Coordinate: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}</p>
+        <p>Coordinate: ${currentEmergency!.latitude.toFixed(6)}, ${currentEmergency!.longitude.toFixed(6)}</p>
       </div>`
     });
 
@@ -325,7 +352,12 @@ export function Dashboard() {
   };
 
   const handleCloseEmergency = (latitude?: number, longitude?: number) => {
+    console.log('Closing emergency modal');
+    console.log('Current emergency:', currentEmergency);
+    console.log('Map:', map);
+    console.log('Marker:', marker);
     if (!currentEmergency || !map || !marker) return;
+    console.log('Closing emergency modal with coordinates:', latitude, longitude);
 
     // If coordinates are provided, center and zoom the map
     if (latitude !== undefined && longitude !== undefined) {
@@ -360,7 +392,7 @@ export function Dashboard() {
           </button>
         )}
       </div>
-      
+
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-lg bg-white p-6 shadow-md">
           <div className="flex items-center">
@@ -509,7 +541,6 @@ export function Dashboard() {
       {currentEmergency && (
         <EmergencyModal
           isOpen={showEmergencyModal}
-          
           onClose={handleCloseEmergency}
           emergency={currentEmergency}
         />
